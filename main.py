@@ -4,7 +4,6 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
 import os
-import glob
 import getpass
 
 KEY_DIR = "chaves/"  # Diretório para armazenar chaves
@@ -27,7 +26,9 @@ def generate_keys():
         backend=default_backend()
     )
     public_key = private_key.public_key()
-    return private_key, public_key
+    save_private_key(private_key)
+    save_public_key(public_key)
+    print("Novo par de chaves gerado e salvo com sucesso.")
 
 def save_private_key(private_key, filename="private_key.pem", password="emilianoewladimir"):
     """
@@ -42,7 +43,6 @@ def save_private_key(private_key, filename="private_key.pem", password="emiliano
     )
     with open(os.path.join(KEY_DIR, filename), 'wb') as f:
         f.write(pem)
-        print(f"Chave privada salva como {filename}.")
 
 def save_public_key(public_key, filename="public_key.pem"):
     """
@@ -55,7 +55,6 @@ def save_public_key(public_key, filename="public_key.pem"):
     )
     with open(os.path.join(KEY_DIR, filename), 'wb') as f:
         f.write(pem)
-        print(f"Chave pública salva como {filename}.")
 
 def load_private_key(filename="private_key.pem", password=None):
     """
@@ -63,7 +62,7 @@ def load_private_key(filename="private_key.pem", password=None):
     Modificado temporariamente para usar input() devido a problemas de ambiente.
     """
     if password is None:
-        password = input("Digite a senha para desbloquear a chave privada: ")  # Temporariamente substituído por input()
+        password = input("Digite a senha para desbloquear a chave privada (temporário): ")  # Usando input temporariamente
 
     try:
         with open(os.path.join(KEY_DIR, filename), 'rb') as f:
@@ -77,7 +76,6 @@ def load_private_key(filename="private_key.pem", password=None):
     except Exception as e:
         print(f"Erro ao carregar a chave privada: {e}")
         return None
-
 
 def load_public_key(filename="public_key.pem"):
     """
@@ -94,16 +92,14 @@ def load_public_key(filename="public_key.pem"):
         print(f"Erro ao carregar a chave pública: {e}")
         return None
 
-def encrypt_file(input_filename, output_filename, public_key):
+def encrypt_text_directly(text, output_filename, hex_output_filename, public_key):
     """
-    Criptografa um arquivo usando a chave pública RSA.
+    Criptografa texto diretamente usando a chave pública RSA e salva o resultado criptografado.
+    Salva também o resultado em formato hexadecimal em um arquivo separado.
     """
     try:
-        with open(input_filename, 'rb') as f:
-            plaintext = f.read()
-
         ciphertext = public_key.encrypt(
-            plaintext,
+            text.encode(),
             padding.OAEP(
                 mgf=padding.MGF1(algorithm=hashes.SHA256()),
                 algorithm=hashes.SHA256(),
@@ -111,19 +107,24 @@ def encrypt_file(input_filename, output_filename, public_key):
             )
         )
 
+        # Salvar o texto criptografado em um arquivo
         with open(output_filename, 'wb') as f:
             f.write(ciphertext)
-        print(f"Arquivo criptografado salvo como {output_filename}.")
-    except Exception as e:
-        print(f"Erro ao criptografar o arquivo: {e}")
+        print(f"Texto criptografado salvo como {output_filename}.")
 
-def decrypt_file(input_filename, output_filename, private_key, password=None):
+        # Salvar a versão hexadecimal do texto criptografado
+        with open(hex_output_filename, 'w') as f:
+            f.write(ciphertext.hex())
+        print(f"Texto criptografado em hexadecimal salvo como {hex_output_filename}.")
+    except Exception as e:
+        print(f"Erro ao criptografar o texto: {e}")
+
+def decrypt_text_directly(hex_input, output_filename, private_key):
     """
-    Descriptografa um arquivo usando a chave privada RSA.
+    Descriptografa texto em formato hexadecimal usando a chave privada RSA.
     """
     try:
-        with open(input_filename, 'rb') as f:
-            ciphertext = f.read()
+        ciphertext = bytes.fromhex(hex_input)
 
         plaintext = private_key.decrypt(
             ciphertext,
@@ -136,49 +137,37 @@ def decrypt_file(input_filename, output_filename, private_key, password=None):
 
         with open(output_filename, 'wb') as f:
             f.write(plaintext)
-        print(f"Arquivo descriptografado salvo como {output_filename}.")
+        print(f"Texto descriptografado salvo como {output_filename}.")
     except Exception as e:
-        print(f"Erro ao descriptografar o arquivo: {e}")
-
-def get_user_input_and_save(filename):
-    """
-    Solicita ao usuário o texto em claro e salva em um arquivo.
-    """
-    user_input = input("Digite o texto que deseja criptografar: ")
-    with open(filename, 'w') as file:
-        file.write(user_input)
-    print(f"Texto salvo em {filename}.")
+        print(f"Erro ao descriptografar o texto: {e}")
 
 def menu():
     while True:
         print("\nMenu:")
         print("1. Gerar novo par de chaves")
-        print("2. Criptografar um texto")
-        print("3. Descriptografar um texto")
+        print("2. Criptografar texto inserido")
+        print("3. Descriptografar texto hexadecimal inserido")
         print("4. Sair")
 
         choice = input("Escolha uma opção (1-4): ")
 
         if choice == '1':
-            private_key, public_key = generate_keys()
-            save_private_key(private_key)
-            save_public_key(public_key)
-            print("Novo par de chaves gerado e salvo com sucesso.")
+            generate_keys()
         elif choice == '2':
-            plaintext_filename = 'plaintext.txt'
+            text = input("Digite o texto que deseja criptografar: ")
             encrypted_filename = 'encrypted.txt'
-            get_user_input_and_save(plaintext_filename)
+            encrypted_hex_filename = 'encrypted_hex.txt'  # Novo arquivo para salvar o hexadecimal
             public_key = load_public_key()
             if public_key:
-                encrypt_file(plaintext_filename, encrypted_filename, public_key)
+                encrypt_text_directly(text, encrypted_filename, encrypted_hex_filename, public_key)
             else:
                 print("Falha ao carregar a chave pública.")
         elif choice == '3':
-            encrypted_filename = 'encrypted.txt'
+            hex_input = input("Cole o texto criptografado em hexadecimal: ")
             decrypted_filename = 'decrypted.txt'
-            private_key = load_private_key()  # Senha solicitada durante a carga
+            private_key = load_private_key()
             if private_key:
-                decrypt_file(encrypted_filename, decrypted_filename, private_key)
+                decrypt_text_directly(hex_input, decrypted_filename, private_key)
             else:
                 print("Falha ao carregar a chave privada.")
         elif choice == '4':
@@ -190,9 +179,7 @@ def menu():
 def main():
     if not os.listdir(KEY_DIR):
         print("Nenhum par de chaves encontrado. Gerando um novo par...")
-        private_key, public_key = generate_keys()
-        save_private_key(private_key)
-        save_public_key(public_key)
+        generate_keys()
     menu()
 
 if __name__ == "__main__":
