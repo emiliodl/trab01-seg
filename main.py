@@ -1,6 +1,8 @@
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes
 import os
 import glob
 import getpass
@@ -58,10 +60,10 @@ def save_public_key(public_key, filename="public_key.pem"):
 def load_private_key(filename="private_key.pem", password=None):
     """
     Carrega uma chave privada de um arquivo, solicitando uma senha se necessário.
+    (Modificado temporariamente para usar input() para compatibilidade)
     """
     if password is None:
-        # Altere para input() temporariamente se getpass não estiver funcionando
-        password = input("Digite a senha para desbloquear a chave privada: ")  # Usar em caso de falha de getpass
+        password = input("Digite a senha para desbloquear a chave privada: ")  # Temporário para desenvolvimento
 
     try:
         with open(os.path.join(KEY_DIR, filename), 'rb') as f:
@@ -92,38 +94,78 @@ def load_public_key(filename="public_key.pem"):
         print(f"Erro ao carregar a chave pública: {e}")
         return None
 
-def list_keys():
+def encrypt_file(input_filename, output_filename, public_key):
     """
-    Lista todos os arquivos de chave no diretório de chaves.
+    Criptografa um arquivo usando a chave pública RSA.
     """
-    ensure_key_directory()
-    files = glob.glob(f"{KEY_DIR}*.pem")
-    keys = [os.path.basename(file) for file in files]
-    return keys
+    try:
+        with open(input_filename, 'rb') as f:
+            plaintext = f.read()
 
-def search_key(keyword):
-    """
-    Pesquisa arquivos de chave que contêm a palavra-chave fornecida no nome.
-    """
-    all_keys = list_keys()
-    found_keys = [key for key in all_keys if keyword in key]
-    return found_keys
+        ciphertext = public_key.encrypt(
+            plaintext,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
 
-def delete_key(key_name):
+        with open(output_filename, 'wb') as f:
+            f.write(ciphertext)
+        print(f"Arquivo criptografado salvo como {output_filename}.")
+    except Exception as e:
+        print(f"Erro ao criptografar o arquivo: {e}")
+
+def decrypt_file(input_filename, output_filename, private_key, password=None):
     """
-    Apaga um arquivo de chave específico, se existir.
+    Descriptografa um arquivo usando a chave privada RSA.
     """
-    key_path = os.path.join(KEY_DIR, key_name)
-    if os.path.exists(key_path):
-        os.remove(key_path)
-        print(f"Chave {key_name} apagada com sucesso.")
+    try:
+        with open(input_filename, 'rb') as f:
+            ciphertext = f.read()
+
+        plaintext = private_key.decrypt(
+            ciphertext,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+
+        with open(output_filename, 'wb') as f:
+            f.write(plaintext)
+        print(f"Arquivo descriptografado salvo como {output_filename}.")
+    except Exception as e:
+        print(f"Erro ao descriptografar o arquivo: {e}")
+
+def get_user_input_and_save(filename):
+    """
+    Solicita ao usuário o texto em claro e salva em um arquivo.
+    """
+    user_input = input("Digite o texto que deseja criptografar: ")
+    with open(filename, 'w') as file:
+        file.write(user_input)
+    print(f"Texto salvo em {filename}.")
+
+def main():
+    # Gera chaves se necessário
+    if not os.listdir(KEY_DIR):
+        private_key, public_key = generate_keys()
+        save_private_key(private_key)
+        save_public_key(public_key)
     else:
-        print("Chave não encontrada.")
+        public_key = load_public_key()
+        private_key = load_private_key()  # Removida a senha codificada
 
-# Exemplo de uso das funções
-private_key, public_key = generate_keys()
-save_private_key(private_key)  # Salva com a senha especificada
-save_public_key(public_key)
+    plaintext_filename = 'plaintext.txt'
+    encrypted_filename = 'encrypted.txt'
+    decrypted_filename = 'decrypted.txt'
 
-loaded_private_key = load_private_key()  # Carrega solicitando a senha
-loaded_public_key = load_public_key()
+    get_user_input_and_save(plaintext_filename)
+    encrypt_file(plaintext_filename, encrypted_filename, public_key)
+    decrypt_file(encrypted_filename, decrypted_filename, private_key)  # Removida a senha codificada
+
+if __name__ == "__main__":
+    main()
