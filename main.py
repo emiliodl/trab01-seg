@@ -60,10 +60,10 @@ def save_public_key(public_key, filename="public_key.pem"):
 def load_private_key(filename="private_key.pem", password=None):
     """
     Carrega uma chave privada de um arquivo, solicitando uma senha se necessário.
-    (Modificado temporariamente para usar input() para compatibilidade)
+    Modificado temporariamente para usar input() devido a problemas de ambiente.
     """
     if password is None:
-        password = input("Digite a senha para desbloquear a chave privada: ")  # Temporário para desenvolvimento
+        password = input("Digite a senha para desbloquear a chave privada: ")  # Temporariamente substituído por input()
 
     try:
         with open(os.path.join(KEY_DIR, filename), 'rb') as f:
@@ -149,23 +149,51 @@ def get_user_input_and_save(filename):
         file.write(user_input)
     print(f"Texto salvo em {filename}.")
 
+def menu():
+    while True:
+        print("\nMenu:")
+        print("1. Gerar novo par de chaves")
+        print("2. Criptografar um texto")
+        print("3. Descriptografar um texto")
+        print("4. Sair")
+
+        choice = input("Escolha uma opção (1-4): ")
+
+        if choice == '1':
+            private_key, public_key = generate_keys()
+            save_private_key(private_key)
+            save_public_key(public_key)
+            print("Novo par de chaves gerado e salvo com sucesso.")
+        elif choice == '2':
+            plaintext_filename = 'plaintext.txt'
+            encrypted_filename = 'encrypted.txt'
+            get_user_input_and_save(plaintext_filename)
+            public_key = load_public_key()
+            if public_key:
+                encrypt_file(plaintext_filename, encrypted_filename, public_key)
+            else:
+                print("Falha ao carregar a chave pública.")
+        elif choice == '3':
+            encrypted_filename = 'encrypted.txt'
+            decrypted_filename = 'decrypted.txt'
+            private_key = load_private_key()  # Senha solicitada durante a carga
+            if private_key:
+                decrypt_file(encrypted_filename, decrypted_filename, private_key)
+            else:
+                print("Falha ao carregar a chave privada.")
+        elif choice == '4':
+            print("Saindo...")
+            break
+        else:
+            print("Opção inválida. Por favor, tente novamente.")
+
 def main():
-    # Gera chaves se necessário
     if not os.listdir(KEY_DIR):
+        print("Nenhum par de chaves encontrado. Gerando um novo par...")
         private_key, public_key = generate_keys()
         save_private_key(private_key)
         save_public_key(public_key)
-    else:
-        public_key = load_public_key()
-        private_key = load_private_key()  # Removida a senha codificada
-
-    plaintext_filename = 'plaintext.txt'
-    encrypted_filename = 'encrypted.txt'
-    decrypted_filename = 'decrypted.txt'
-
-    get_user_input_and_save(plaintext_filename)
-    encrypt_file(plaintext_filename, encrypted_filename, public_key)
-    decrypt_file(encrypted_filename, decrypted_filename, private_key)  # Removida a senha codificada
+    menu()
 
 if __name__ == "__main__":
     main()
