@@ -3,6 +3,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 import os
 import glob
+import getpass
 
 KEY_DIR = "chaves/"  # Diretório para armazenar chaves
 
@@ -26,16 +27,12 @@ def generate_keys():
     public_key = private_key.public_key()
     return private_key, public_key
 
-def save_private_key(private_key, filename="private_key.pem", password=None):
+def save_private_key(private_key, filename="private_key.pem", password="emilianoewladimir"):
     """
     Salva a chave privada em um arquivo, com a opção de adicionar uma senha para encriptação.
     """
     ensure_key_directory()
-    if password is not None:
-        encryption = serialization.BestAvailableEncryption(password.encode())
-    else:
-        encryption = serialization.NoEncryption()
-    
+    encryption = serialization.BestAvailableEncryption(password.encode())    
     pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
@@ -60,19 +57,25 @@ def save_public_key(public_key, filename="public_key.pem"):
 
 def load_private_key(filename="private_key.pem", password=None):
     """
-    Carrega uma chave privada de um arquivo, com a opção de usar uma senha se a chave foi encriptada.
+    Carrega uma chave privada de um arquivo, solicitando uma senha se necessário.
     """
+    if password is None:
+        # Altere para input() temporariamente se getpass não estiver funcionando
+        password = input("Digite a senha para desbloquear a chave privada: ")  # Usar em caso de falha de getpass
+
     try:
         with open(os.path.join(KEY_DIR, filename), 'rb') as f:
             private_key = serialization.load_pem_private_key(
                 f.read(),
-                password=password.encode() if password else None,
+                password=password.encode(),
                 backend=default_backend()
             )
+        print("Chave privada carregada com sucesso.")
         return private_key
     except Exception as e:
         print(f"Erro ao carregar a chave privada: {e}")
         return None
+
 
 def load_public_key(filename="public_key.pem"):
     """
@@ -119,13 +122,8 @@ def delete_key(key_name):
 
 # Exemplo de uso das funções
 private_key, public_key = generate_keys()
-save_private_key(private_key, password="senha_segura")  # Opção com senha
+save_private_key(private_key)  # Salva com a senha especificada
 save_public_key(public_key)
 
-loaded_private_key = load_private_key(password="senha_segura")
+loaded_private_key = load_private_key()  # Carrega solicitando a senha
 loaded_public_key = load_public_key()
-
-print("Chaves disponíveis:", list_keys())
-found = search_key("public")
-print("Chaves encontradas:", found)
-delete_key("public_key.pem")
