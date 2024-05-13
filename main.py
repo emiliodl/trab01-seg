@@ -18,7 +18,7 @@ def ensure_key_directory():
 
 def generate_keys():
     """
-    Gera um par de chaves privada e pública.
+    Gera um par de chaves privada e pública, pedindo ao usuário para fornecer uma senha.
     """
     private_key = rsa.generate_private_key(
         public_exponent=65537,
@@ -26,15 +26,23 @@ def generate_keys():
         backend=default_backend()
     )
     public_key = private_key.public_key()
-    save_private_key(private_key)
+
+    # Solicita ao usuário para fornecer uma senha para a chave privada
+    password = getpass.getpass("Digite uma senha para encriptar a chave privada: ")
+
+    save_private_key(private_key, password=password)
     save_public_key(public_key)
     print("Novo par de chaves gerado e salvo com sucesso.")
 
-def save_private_key(private_key, filename="private_key.pem", password="emilianoewladimir"):
+
+def save_private_key(private_key, filename="private_key.pem", password=None):
     """
     Salva a chave privada em um arquivo, com a opção de adicionar uma senha para encriptação.
     """
     ensure_key_directory()
+    if password is None:
+        password = getpass.getpass("Digite a senha para encriptar a chave privada (se necessário): ")
+
     encryption = serialization.BestAvailableEncryption(password.encode())    
     pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
@@ -43,6 +51,7 @@ def save_private_key(private_key, filename="private_key.pem", password="emiliano
     )
     with open(os.path.join(KEY_DIR, filename), 'wb') as f:
         f.write(pem)
+
 
 def save_public_key(public_key, filename="public_key.pem"):
     """
